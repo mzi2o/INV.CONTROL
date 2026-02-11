@@ -1,0 +1,17 @@
+DIGITAL-ASSET-MANAGER/
+├── client/                # Frontend React app  
+├── server/                # Backend Node.js/Express API     
+├── shared/                # Shared code between client/server    
+├── script/                # Build and utility scripts   
+├── .gitignore             # Git configuration       
+├── drizzle.config.ts      # Database config    
+├── package.json           # Dependencies    
+├── package-lock.json      # Dependency versions Consistent dependency installation
+├── postcss.config.js      # CSS processing    
+├── tailwind.config.ts     # Styling    
+└── vite.config.ts         # Build config    
+
+
+
+
+
