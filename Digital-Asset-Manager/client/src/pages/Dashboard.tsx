@@ -1,8 +1,9 @@
 import { Layout } from "@/components/Layout";
 import { StatsCard } from "@/components/StatsCard";
-import { useTransactions, useDashboardStats, useTonerUsage, type TonerUsageRecord } from "@/hooks/use-transactions";
+import { useTransactions, useDashboardStats, useTonerUsage, useDismissTonerAlert, type TonerUsageRecord } from "@/hooks/use-transactions";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
-import { Boxes, Package, ArrowUpRight, AlertTriangle, ShieldAlert, Printer, Factory } from "lucide-react";
+import { Boxes, Package, ArrowUpRight, AlertTriangle, ShieldAlert, Printer, Factory, X } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useMemo } from "react";
 
 export default function Dashboard() {
@@ -18,6 +20,9 @@ export default function Dashboard() {
   const { data: tonerUsage, isLoading: tonerLoading } = useTonerUsage();
   const [selectedTxn, setSelectedTxn] = useState<any>(null);
   const [analyticsMode, setAnalyticsMode] = useState<"IT" | "MAK">("IT");
+  const { mutate: dismissAlert } = useDismissTonerAlert();
+  const [dismissId, setDismissId] = useState<number | null>(null);
+  const [deptFilter, setDeptFilter] = useState("All");
 
   const chartData = transactions?.slice(0, 20).reverse().map((t: any) => ({
     date: t.transDate ? format(new Date(t.transDate), 'MM/dd') : '--',
@@ -60,6 +65,20 @@ export default function Dashboard() {
       .map(([, v]) => v)
       .slice(-6);
   }, [filteredTonerUsage]);
+
+  const departmentList = useMemo(() => {
+    if (!filteredTonerUsage.length) return [];
+    const depts = new Set<string>();
+    filteredTonerUsage.forEach(u => {
+      if (u.departmentName) depts.add(u.departmentName);
+    });
+    return Array.from(depts).sort();
+  }, [filteredTonerUsage]);
+
+  const deptFilteredUsage = useMemo(() => {
+    if (deptFilter === "All") return filteredTonerUsage;
+    return filteredTonerUsage.filter(u => u.departmentName === deptFilter);
+  }, [filteredTonerUsage, deptFilter]);
 
   const deptBreakdown = useMemo(() => {
     if (!filteredTonerUsage.length) return [];
@@ -273,7 +292,7 @@ export default function Dashboard() {
               </p>
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
                 {flaggedRecords.slice(0, 10).map(r => (
-                  <div key={r.id} className="flex items-center justify-between gap-4 p-3 rounded-md bg-destructive/5 border border-destructive/20 min-h-[48px]" data-testid={`row-flagged-${r.id}`}>
+                  <div key={r.id} className="flex items-center justify-between gap-4 p-3 rounded-md bg-destructive/5 border border-destructive/20 min-h-[48px] relative" data-testid={`row-flagged-${r.id}`}>
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
                       <div className="min-w-0">
@@ -286,6 +305,15 @@ export default function Dashboard() {
                       <span className="text-xs text-muted-foreground">
                         {r.consumptionDate ? format(new Date(r.consumptionDate), 'PP') : '--'}
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => setDismissId(r.id)}
+                        data-testid={`button-dismiss-${r.id}`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -370,8 +398,23 @@ export default function Dashboard() {
           </div>
 
           <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-2">Consumption History</h3>
-            <p className="text-xs text-muted-foreground mb-4">{analyticsMode === "IT" ? "IT" : "MAK"} consumable dispensing records</p>
+            <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Consumption History</h3>
+                <p className="text-xs text-muted-foreground">{analyticsMode === "IT" ? "IT" : "MAK"} consumable dispensing records</p>
+              </div>
+              <Select value={deptFilter} onValueChange={setDeptFilter}>
+                <SelectTrigger className="w-48" data-testid="select-dept-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Departments</SelectItem>
+                  {departmentList.map(dept => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm" data-testid="table-toner-history">
                 <thead>
@@ -391,14 +434,14 @@ export default function Dashboard() {
                         <td colSpan={6} className="py-3 px-3"><Skeleton className="h-8 w-full" /></td>
                       </tr>
                     ))
-                  ) : filteredTonerUsage.length === 0 ? (
+                  ) : deptFilteredUsage.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-center text-muted-foreground py-12">
-                        No consumption records for {analyticsMode} mode
+                        No consumption records{deptFilter !== "All" ? ` for ${deptFilter}` : ` for ${analyticsMode} mode`}
                       </td>
                     </tr>
                   ) : (
-                    filteredTonerUsage.slice(0, 25).map(r => (
+                    deptFilteredUsage.slice(0, 25).map(r => (
                       <tr
                         key={r.id}
                         className={cn(
@@ -507,6 +550,30 @@ export default function Dashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!dismissId} onOpenChange={() => setDismissId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Dismiss Alert</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dismiss this alert permanently? This action will be logged in the audit trail.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (dismissId) {
+                  dismissAlert(dismissId, { onSuccess: () => setDismissId(null) });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Dismiss
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

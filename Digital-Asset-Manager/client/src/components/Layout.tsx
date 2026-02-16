@@ -25,8 +25,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-background text-foreground overflow-hidden">
-      <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card/50 backdrop-blur-sm z-20">
-        <div className="p-6 border-b border-border/50">
+      <aside className="hidden md:flex flex-col w-64 border-r border-sidebar-border z-20" style={{ backgroundColor: 'hsl(var(--sidebar))', color: 'hsl(var(--sidebar-foreground))' }}>
+        <div className="p-6 border-b border-[hsl(var(--sidebar-border))]">
           <h1 className="text-xl font-bold tracking-tighter text-primary">
             INV.CONTROL
           </h1>
@@ -40,29 +40,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 cursor-pointer min-h-[48px]",
                   location === item.href
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover-elevate"
+                    ? "bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]"
+                    : "text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))]/30"
                 )}
                 data-testid={`nav-${item.href.replace('/', '') || 'dashboard'}`}
               >
-                <item.icon className={cn("w-5 h-5", location === item.href && "text-primary")} />
+                <item.icon className="w-5 h-5" />
                 <span className="font-medium text-sm">{item.label}</span>
               </div>
             </Link>
           ))}
         </nav>
 
-        <div className="p-4 space-y-3 border-t border-border/50">
+        <div className="p-4 space-y-3 border-t border-[hsl(var(--sidebar-border))]">
           {user && (
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                <User className="w-4 h-4 text-primary" />
+            <Link href="/profile">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer hover-elevate">
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium truncate" data-testid="text-current-user">{user.name}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{user.role}</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium truncate" data-testid="text-current-user">{user.name}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{user.role}</p>
-              </div>
-            </div>
+            </Link>
           )}
           <div className="flex items-center gap-2">
             <Button

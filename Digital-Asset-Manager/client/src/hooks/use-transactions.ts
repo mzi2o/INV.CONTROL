@@ -66,6 +66,26 @@ export function useDepartments() {
   });
 }
 
+export function useDismissTonerAlert() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/analytics/toner-alert/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/toner-usage"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/dashboard"] });
+      toast({ title: "Alert Dismissed", description: "The abuse alert has been removed." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 export type TonerUsageRecord = {
   id: number;
   productId: number;

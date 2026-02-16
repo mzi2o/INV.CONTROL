@@ -21,12 +21,17 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserById(id: number): Promise<User | undefined>;
   createUser(user: any): Promise<User>;
+  updatePassword(id: number, passwordHash: string): Promise<void>;
   updateLastLogin(id: number): Promise<void>;
+  getUserRequests(userId: number): Promise<any[]>;
 
   getPurchaseRequests(): Promise<PurchaseRequest[]>;
   createPurchaseRequest(request: any, items: any[]): Promise<PurchaseRequest>;
   getPendingItemsBySku(sku: string): Promise<any[]>;
   getPurchaseRequestItems(requestId: number): Promise<PurchaseRequestItem[]>;
+
+  updatePurchaseRequest(id: number, data: any): Promise<PurchaseRequest>;
+  deletePurchaseRequest(id: number): Promise<void>;
 
   getReceivingTimeline(purchaseRequestItemId: number): Promise<any[]>;
   receiveItem(data: any): Promise<ReceivingTransaction>;
@@ -37,6 +42,7 @@ export interface IStorage {
   getTransactionWithDetails(id: number): Promise<any>;
   getDashboardStats(): Promise<any>;
   getTonerUsage(): Promise<any[]>;
+  dismissTonerAlert(id: number): Promise<void>;
   checkTonerAbuse(productId: number, deptId: number, newQuantity: number): Promise<ConsumptionWarning>;
 }
 
@@ -101,8 +107,26 @@ export class DatabaseStorage implements IStorage {
     return newUser;
   }
 
+  async updatePassword(id: number, passwordHash: string): Promise<void> {
+    await db.update(users).set({ passwordHash }).where(eq(users.id, id));
+  }
+
   async updateLastLogin(id: number): Promise<void> {
     await db.update(users).set({ lastLogin: new Date() }).where(eq(users.id, id));
+  }
+
+  async getUserRequests(userId: number): Promise<any[]> {
+    const user = await this.getUserById(userId);
+    if (!user) return [];
+    // Match requests where requestedBy contains the user's name
+    const allRequests = await this.getPurchaseRequests();
+    // Also get items for each request
+    const results = [];
+    for (const req of allRequests) {
+      const items = await this.getPurchaseRequestItems(req.id);
+      results.push({ ...req, items });
+    }
+    return results;
   }
 
   async getPurchaseRequests(): Promise<PurchaseRequest[]> {
@@ -124,6 +148,18 @@ export class DatabaseStorage implements IStorage {
       }
 
       return { ...newRequest, requestQr };
+    });
+  }
+
+  async updatePurchaseRequest(id: number, data: any): Promise<PurchaseRequest> {
+    const [updated] = await db.update(purchaseRequests).set(data).where(eq(purchaseRequests.id, id)).returning();
+    return updated;
+  }
+
+  async deletePurchaseRequest(id: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(purchaseRequestItems).where(eq(purchaseRequestItems.requestId, id));
+      await tx.delete(purchaseRequests).where(eq(purchaseRequests.id, id));
     });
   }
 
@@ -420,6 +456,10 @@ export class DatabaseStorage implements IStorage {
     .orderBy(desc(tonerConsumption.consumptionDate));
 
     return usage;
+  }
+
+  async dismissTonerAlert(id: number): Promise<void> {
+    await db.update(tonerConsumption).set({ isFlagged: false }).where(eq(tonerConsumption.id, id));
   }
 
   async checkTonerAbuse(productId: number, deptId: number, newQuantity: number): Promise<ConsumptionWarning> {
