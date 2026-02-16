@@ -12,6 +12,7 @@ import IssueTracker from "@/pages/IssueTracker";
 import Inventory from "@/pages/Inventory";
 import PurchaseRequest from "@/pages/PurchaseRequest";
 import Login from "@/pages/Login";
+import Profile from "@/pages/Profile";
 
 function Router() {
   return (
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/receiving" component={Receiving} />
       <Route path="/issue" component={IssueTracker} />
       <Route path="/inventory" component={Inventory} />
+      <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
   );

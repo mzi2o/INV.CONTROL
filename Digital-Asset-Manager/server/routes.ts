@@ -94,6 +94,41 @@ export async function registerRoutes(
     });
   });
 
+  app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current and new password are required" });
+      }
+      // Validate new password
+      if (newPassword.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
+      if (!/[A-Z]/.test(newPassword)) return res.status(400).json({ message: "Password must contain an uppercase letter" });
+      if (!/[0-9]/.test(newPassword)) return res.status(400).json({ message: "Password must contain a number" });
+      if (!/[^A-Za-z0-9]/.test(newPassword)) return res.status(400).json({ message: "Password must contain a special character" });
+
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!valid) return res.status(401).json({ message: "Current password is incorrect" });
+
+      const newHash = await bcrypt.hash(newPassword, 10);
+      await storage.updatePassword(user.id, newHash);
+      res.json({ message: "Password changed successfully" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  app.get('/api/user/requests', requireAuth, async (req, res) => {
+    try {
+      const requests = await storage.getUserRequests(req.session.userId!);
+      res.json(requests);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch user requests" });
+    }
+  });
+
   app.get(api.products.list.path, requireAuth, async (req, res) => {
     try {
       const products = await storage.getProducts();
@@ -198,6 +233,27 @@ export async function registerRoutes(
     }
   });
 
+  app.patch('/api/purchase-requests/:id', requireAuth, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { requestedBy, notes, status } = req.body;
+      const updated = await storage.updatePurchaseRequest(id, { requestedBy, notes, status });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update purchase request" });
+    }
+  });
+
+  app.delete('/api/purchase-requests/:id', requireAuth, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deletePurchaseRequest(id);
+      res.json({ message: "Purchase request deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete purchase request" });
+    }
+  });
+
   app.get(api.purchaseRequests.getWithItems.path, requireAuth, async (req, res) => {
     try {
       const items = await storage.getPurchaseRequestItems(Number(req.params.id));
@@ -282,6 +338,16 @@ export async function registerRoutes(
       res.json(stats);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  app.delete('/api/analytics/toner-alert/:id', requireAuth, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.dismissTonerAlert(id);
+      res.json({ message: "Alert dismissed" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to dismiss alert" });
     }
   });
 
